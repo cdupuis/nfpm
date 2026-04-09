@@ -16,6 +16,60 @@
 					"scripts": {
 						"$ref": "#/$defs/APKScripts",
 						"title": "apk scripts"
+					},
+					"pkgname": {
+						"type": "string",
+						"title": "package name in .PKGINFO"
+					},
+					"pkgver": {
+						"type": "string",
+						"title": "package version in .PKGINFO"
+					},
+					"builddate": {
+						"type": "integer",
+						"title": "package build time as unix seconds"
+					},
+					"packager": {
+						"type": "string",
+						"title": "packager field in .PKGINFO"
+					},
+					"origin": {
+						"type": "string",
+						"title": "origin in .PKGINFO"
+					},
+					"commit": {
+						"type": "string",
+						"title": "commit in .PKGINFO"
+					},
+					"replaces_priority": {
+						"type": "integer",
+						"title": "replaces priority in .PKGINFO"
+					},
+					"provider_priority": {
+						"type": "integer",
+						"title": "provider priority in .PKGINFO"
+					},
+					"triggers": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array",
+						"title": "triggers lines in .PKGINFO"
+					},
+					"install_if": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array",
+						"title": "install_if lines in .PKGINFO"
+					},
+					"pkginfo_generator": {
+						"type": "string",
+						"title": "PKGINFO generator label for comment header"
+					},
+					"pkginfo_generator_version": {
+						"type": "string",
+						"title": "optional version for PKGINFO generator line"
 					}
 				},
 				"additionalProperties": false,
