@@ -676,6 +676,80 @@ func TestPackageSymlinks(t *testing.T) {
 	require.NoError(t, Default.Package(info, io.Discard))
 }
 
+// TestPackageSymlinkInstalledSize guards against a regression where
+// symlink-only packages reported size=0 in .PKGINFO, causing apk to treat
+// them as empty on install. Symlinks must contribute len(target) to the
+// installed size, matching abuild's `du -bc $pkgdir` behavior.
+func TestPackageSymlinkInstalledSize(t *testing.T) {
+	target := "/usr/bin/docker-scout"
+
+	t.Run("symlink-only package has non-zero size", func(t *testing.T) {
+		info := exampleInfo()
+		info.Contents = []*files.Content{
+			{
+				Source:      target,
+				Destination: "/usr/libexec/docker/cli-plugins/docker-scout",
+				Type:        files.TypeSymlink,
+			},
+		}
+		require.NoError(t, nfpm.PrepareForPackager(info, "apk"))
+
+		var buf bytes.Buffer
+		size := int64(0)
+		require.NoError(t, createFilesInsideTarGz(info, tar.NewWriter(&buf), &size))
+		require.Equal(t, int64(len(target)), size,
+			"symlink-only package should charge len(target) per symlink, got %d", size)
+	})
+
+	t.Run("mixed file and symlink are additive", func(t *testing.T) {
+		info := exampleInfo()
+		info.Contents = []*files.Content{
+			{
+				Source:      "../testdata/whatever.conf",
+				Destination: "/etc/foo/file",
+			},
+			{
+				Source:      target,
+				Destination: "/usr/bin/alias",
+				Type:        files.TypeSymlink,
+			},
+		}
+		require.NoError(t, nfpm.PrepareForPackager(info, "apk"))
+
+		fileSize, err := os.Stat("../testdata/whatever.conf")
+		require.NoError(t, err)
+
+		var buf bytes.Buffer
+		size := int64(0)
+		require.NoError(t, createFilesInsideTarGz(info, tar.NewWriter(&buf), &size))
+		require.Equal(t, fileSize.Size()+int64(len(target)), size)
+	})
+
+	t.Run("pkginfo reports non-zero size for symlink-only package", func(t *testing.T) {
+		info := exampleInfo()
+		info.Contents = []*files.Content{
+			{
+				Source:      target,
+				Destination: "/usr/libexec/docker/cli-plugins/docker-scout",
+				Type:        files.TypeSymlink,
+			},
+		}
+		require.NoError(t, nfpm.PrepareForPackager(info, "apk"))
+
+		var dataBuf bytes.Buffer
+		size := int64(0)
+		require.NoError(t, createFilesInsideTarGz(info, tar.NewWriter(&dataBuf), &size))
+
+		var controlBuf bytes.Buffer
+		require.NoError(t, createBuilderControl(info, size, sha256.New().Sum(nil))(tar.NewWriter(&controlBuf)))
+
+		pkginfo := string(extractFromTar(t, controlBuf.Bytes(), ".PKGINFO"))
+		require.NotContains(t, pkginfo, "size = 0\n",
+			"symlink-only packages must not emit size = 0 in .PKGINFO; a package declared size=0 is treated by apk as empty on install")
+		require.Contains(t, pkginfo, fmt.Sprintf("size = %d\n", len(target)))
+	})
+}
+
 func TestDirectories(t *testing.T) {
 	info := exampleInfo()
 	info.Contents = []*files.Content{

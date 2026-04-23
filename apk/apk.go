@@ -432,6 +432,13 @@ func createFilesInsideTarGz(info *nfpm.Info, tw *tar.Writer, sizep *int64) (err 
 				Typeflag: tar.TypeSymlink,
 				ModTime:  file.FileInfo.MTime,
 			})
+			// Account for the symlink's on-disk footprint in the installed
+			// size. apk's .PKGINFO `size` field is the sum of installed file
+			// sizes (cf. Alpine abuild's `du -bc $pkgdir` convention); for
+			// symlinks, `du -b` / lstat report the link target length. Without
+			// this, packages whose payload is entirely symlinks end up with
+			// size=0 and apk treats them as empty on install.
+			*sizep += int64(len(file.Source))
 		default:
 			err = copyToTarAndDigest(file, tw, sizep)
 		}
